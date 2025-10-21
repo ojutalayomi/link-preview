@@ -1,5 +1,5 @@
 # Link Preview API
-
+      
 A high-performance Golang REST API built with Gin framework that fetches website metadata and generates link previews. The API uses goroutines to handle concurrent requests efficiently and extracts Open Graph metadata, page titles, descriptions, and preview images from web pages.
 
 ## Features

@@ -234,16 +234,83 @@ func handleLinkPreview(extractor *MetaExtractor) gin.HandlerFunc {
 	}
 }
 
+// Config holds server configuration
+type Config struct {
+	AllowedOrigins []string
+	Port           string
+}
+
+// NewConfig creates a new configuration with default values
+func NewConfig() *Config {
+	// Get allowed origins from environment variable
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	var origins []string
+	
+	if allowedOrigins != "" {
+		// Split by comma and trim spaces
+		for _, origin := range strings.Split(allowedOrigins, ",") {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				origins = append(origins, origin)
+			}
+		}
+	}
+	
+	// Default to allowing common development origins if none specified
+	if len(origins) == 0 {
+		origins = []string{"https://localhost:3000", "http://localhost:3000", "http://localhost:5173"}
+	}
+	
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = ":5465"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port =":" + port
+	}
+	
+	return &Config{
+		AllowedOrigins: origins,
+		Port:           port,
+	}
+}
+
+// isOriginAllowed checks if the given origin is in the allowed list
+func (c *Config) isOriginAllowed(origin string) bool {
+	for _, allowed := range c.AllowedOrigins {
+		if allowed == "*" || allowed == origin {
+			return true
+		}
+	}
+	return false
+}
+
 // setupRoutes configures all the API routes
-func setupRoutes(extractor *MetaExtractor) *gin.Engine {
+func setupRoutes(extractor *MetaExtractor, config *Config) *gin.Engine {
 	// Create Gin router with default middleware (logger and recovery)
 	router := gin.Default()
-	fmt.Printf("\nGIN_MODE is %s\n", os.Getenv("GIN_MODE"))
+	fmt.Printf("\nGIN_MODE is %s\n", os.Getenv("ALLOWED_ORIGINS"))
 	gin.SetMode(os.Getenv("GIN_MODE"))
 
-	// Add CORS middleware to allow cross-origin requests
+	// Add CORS middleware with configurable allowed origins
 	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		
+		// Set CORS headers based on configuration
+		if origin != "" {
+			if config.isOriginAllowed(origin) {
+				// Allow specific origin (required when credentials are used)
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Access-Control-Allow-Credentials", "true")
+			} else if len(config.AllowedOrigins) == 1 && config.AllowedOrigins[0] == "*" {
+				// Only use wildcard if no specific origin is provided and wildcard is allowed
+				c.Header("Access-Control-Allow-Origin", "*")
+			}
+		} else if len(config.AllowedOrigins) == 1 && config.AllowedOrigins[0] == "*" {
+			// No origin header, use wildcard if configured
+			c.Header("Access-Control-Allow-Origin", "*")
+		}
+		
 		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -305,25 +372,28 @@ func setupRoutes(extractor *MetaExtractor) *gin.Engine {
 }
 
 func main() {
+	// Create configuration
+	config := NewConfig()
+	
 	// Create meta extractor instance
 	extractor := NewMetaExtractor()
 
-	// Setup routes
-	router := setupRoutes(extractor)
+	// Setup routes with configuration
+	router := setupRoutes(extractor, config)
 
-	// Get port from environment or use default
-	port := ":5465"
-	if envPort := gin.Mode(); envPort != "" {
-		// You can set GIN_MODE=release and use different port logic here
-	}
-
-	fmt.Printf("🚀 Link Preview API server starting on port %s\n", port)
+	fmt.Printf("🚀 Link Preview API server starting on port %s\n", config.Port)
+	fmt.Printf("🌐 Allowed origins: %v\n", config.AllowedOrigins)
 	fmt.Println("📝 API Documentation available at: /")
 	fmt.Println("🏥 Health check available at: /health")
 	fmt.Println("🔗 Preview endpoint: POST /preview")
+	fmt.Println("")
+	fmt.Println("Environment variables:")
+	fmt.Println("  ALLOWED_ORIGINS: Comma-separated list of allowed origins (default: *)")
+	fmt.Println("  PORT: Server port (default: 5465)")
+	fmt.Println("  GIN_MODE: Gin mode (debug, release, test)")
 
 	// Start server
-	if err := router.Run(port); err != nil {
+	if err := router.Run(config.Port); err != nil {
 		fmt.Printf("❌ Failed to start server: %v\n", err)
 	}
 }
