@@ -222,6 +222,7 @@ func handleLinkPreview(extractor *MetaExtractor) gin.HandlerFunc {
 				c.JSON(http.StatusOK, result)
 			} else {
 				// Return successful preview data
+				c.Header("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400")
 				c.JSON(http.StatusOK, result)
 			}
 		case <-ctx.Done():
@@ -245,7 +246,7 @@ func NewConfig() *Config {
 	// Get allowed origins from environment variable
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	var origins []string
-	
+
 	if allowedOrigins != "" {
 		// Split by comma and trim spaces
 		for _, origin := range strings.Split(allowedOrigins, ",") {
@@ -255,20 +256,20 @@ func NewConfig() *Config {
 			}
 		}
 	}
-	
+
 	// Default to allowing common development origins if none specified
 	if len(origins) == 0 {
 		origins = []string{"https://localhost:3000", "http://localhost:3000", "http://localhost:5173"}
 	}
-	
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = ":5465"
 	}
 	if !strings.HasPrefix(port, ":") {
-		port =":" + port
+		port = ":" + port
 	}
-	
+
 	return &Config{
 		AllowedOrigins: origins,
 		Port:           port,
@@ -295,7 +296,7 @@ func setupRoutes(extractor *MetaExtractor, config *Config) *gin.Engine {
 	// Add CORS middleware with configurable allowed origins
 	router.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// Set CORS headers based on configuration
 		if origin != "" {
 			if config.isOriginAllowed(origin) {
@@ -310,7 +311,7 @@ func setupRoutes(extractor *MetaExtractor, config *Config) *gin.Engine {
 			// No origin header, use wildcard if configured
 			c.Header("Access-Control-Allow-Origin", "*")
 		}
-		
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -374,7 +375,7 @@ func setupRoutes(extractor *MetaExtractor, config *Config) *gin.Engine {
 func main() {
 	// Create configuration
 	config := NewConfig()
-	
+
 	// Create meta extractor instance
 	extractor := NewMetaExtractor()
 
