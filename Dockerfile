@@ -10,7 +10,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o link-preview-api .
 
 # Final stage
 FROM alpine:latest
@@ -22,6 +22,10 @@ RUN adduser -D -s /bin/sh appuser
 WORKDIR /home/appuser/
 
 COPY --from=builder /app/link-preview-api .
+
+RUN chown appuser:appuser link-preview-api
+
+USER appuser
 
 EXPOSE 5465
 
