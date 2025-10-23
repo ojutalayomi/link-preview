@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
@@ -19,14 +19,10 @@ RUN apk --no-cache add ca-certificates
 
 RUN adduser -D -s /bin/sh appuser
 
-WORKDIR /root/
+WORKDIR /home/appuser/
 
-COPY --from=builder /app/main .
-
-RUN chown appuser:appuser main
-
-USER appuser
+COPY --from=builder /app/link-preview-api .
 
 EXPOSE 5465
 
-CMD ["./main"]
+CMD ["./link-preview-api"]
